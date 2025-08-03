@@ -10,10 +10,14 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Download macOS Ventura Installer
         run: |
-          curl -L -o /tmp/InstallAssistant.pkg https://swcdn.apple.com/content/downloads/46/14/032-90946-A_0UEX6QL7KL/i25scb4j5nsxw35bbtv7k3k7ty8nvblf1z/InstallAssistant.pkg
+          set -e
+          curl --fail -L -o /tmp/InstallAssistant.pkg \
+            https://swcdn.apple.com/content/downloads/46/14/032-90946-A_0UEX6QL7KL/i25scb4j5nsxw35bbtv7k3k7ty8nvblf1z/InstallAssistant.pkg
+          ls -lh /tmp/InstallAssistant.pkg
+          file /tmp/InstallAssistant.pkg
 
       - name: Install the Assistant
         run: |
@@ -21,12 +25,14 @@ jobs:
 
       - name: Create macOS Ventura Installer Disk
         run: |
+          set -e
           sudo hdiutil create -o /tmp/Ventura -size 20000m -volname 'Ventura' -layout SPUD -fs HFS+J
           sudo hdiutil attach /tmp/Ventura.dmg -noverify -mountpoint /Volumes/Ventura
           sleep 10
-          sudo /Applications/'Install macOS Ventura.app'/Contents/Resources/createinstallmedia --volume /Volumes/Ventura --nointeraction
+          sudo /Applications/"Install macOS Ventura.app"/Contents/Resources/createinstallmedia \
+            --volume /Volumes/Ventura --nointeraction
           sleep 10
-          cp -R /Volumes/'Install macOS Ventura'/com.apple.recovery.boot /tmp/com.apple.recovery.boot
+          cp -R /Volumes/"Install macOS Ventura"/com.apple.recovery.boot /tmp/com.apple.recovery.boot
 
       - name: Upload com.apple.recovery.boot
         uses: actions/upload-artifact@v4
