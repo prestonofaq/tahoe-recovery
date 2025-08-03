@@ -1,10 +1,9 @@
-name: Generate macOS Tahoe Recovery Image
+name: Generate macOS Ventura Recovery Image
 
 on:
   workflow_dispatch:
 
-run-name: Generate macOS Tahoe Recovery Image
-
+run-name: Generate macOS Ventura Recovery Image
 
 jobs:
   build:
@@ -12,26 +11,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-
-      - name: Download macOS Installer
+      - name: Download macOS Ventura Installer
         run: |
-          curl -L -o /tmp/InstallAssistant.pkg https://swcdn.apple.com/content/downloads/26/20/082-55599-A_UZPH7KLA4Q/fddo2aezqd7xchfjwh4244kwixjsut4boc/InstallAssistant.pkg
+          curl -L -o /tmp/InstallAssistant.pkg https://swcdn.apple.com/content/downloads/46/14/032-90946-A_0UEX6QL7KL/i25scb4j5nsxw35bbtv7k3k7ty8nvblf1z/InstallAssistant.pkg
 
-      - name: Install the assistant
+      - name: Install the Assistant
         run: |
           sudo installer -pkg /tmp/InstallAssistant.pkg -target /
 
-      - name: Generate macOS Installer
+      - name: Create macOS Ventura Installer Disk
         run: |
-          sudo hdiutil create -o /tmp/Tahoe -size 20000m -volname 'Tahoe' -layout SPUD -fs HFS+J
-          sudo hdiutil attach /tmp/Tahoe.dmg -noverify -mountpoint /Volumes/Tahoe
+          sudo hdiutil create -o /tmp/Ventura -size 20000m -volname 'Ventura' -layout SPUD -fs HFS+J
+          sudo hdiutil attach /tmp/Ventura.dmg -noverify -mountpoint /Volumes/Ventura
           sleep 10
-          sudo /Applications/'Install macOS Beta'.app/Contents/Resources/createinstallmedia --volume /Volumes/Tahoe --nointeraction
-          cp -R '/Volumes/Install macOS Beta/BaseSystem' /tmp/BaseSystem
+          sudo /Applications/'Install macOS Ventura.app'/Contents/Resources/createinstallmedia --volume /Volumes/Ventura --nointeraction
+          sleep 10
+          cp -R /Volumes/'Install macOS Ventura'/com.apple.recovery.boot /tmp/com.apple.recovery.boot
 
       - name: Upload com.apple.recovery.boot
         uses: actions/upload-artifact@v4
         with:
           name: com.apple.recovery.boot
-          path: /tmp/BaseSystem/*
+          path: /tmp/com.apple.recovery.boot
           compression-level: 9
