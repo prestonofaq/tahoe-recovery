@@ -7,21 +7,18 @@ run-name: Generate macOS Ventura Recovery Image
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: macos-13 # Ventura-compatible runner
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download macOS Ventura Installer
+      - name: Install macOS Ventura Installer via softwareupdate
         run: |
           set -e
-          curl --fail -L -o /tmp/InstallAssistant.pkg \
-            https://swcdn.apple.com/content/downloads/46/14/032-90946-A_0UEX6QL7KL/i25scb4j5nsxw35bbtv7k3k7ty8nvblf1z/InstallAssistant.pkg
-          ls -lh /tmp/InstallAssistant.pkg
-          file /tmp/InstallAssistant.pkg
-
-      - name: Install the Assistant
-        run: |
-          sudo installer -pkg /tmp/InstallAssistant.pkg -target /
+          # List available installers
+          softwareupdate --list-full-installers
+          # Download Ventura (13.6.6 is a common latest version)
+          sudo softwareupdate --fetch-full-installer --full-installer-version 13.6.6
+          ls -l /Applications
 
       - name: Create macOS Ventura Installer Disk
         run: |
