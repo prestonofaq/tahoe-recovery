@@ -3,37 +3,90 @@ name: Generate macOS Ventura Recovery Image
 on:
   workflow_dispatch:
 
-run-name: Generate macOS Ventura Recovery Image
-
 jobs:
   build:
-    runs-on: macos-13
+    runs-on: macos-13  # Ventura-compatible GitHub runner
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install macOS Ventura Installer via softwareupdate
+      - name: Show available macOS installers
         run: |
-          set -e
-          # List what's available for debugging
           softwareupdate --list-full-installers
-          # ✅ Download Ventura 13.7.6
-          sudo softwareupdate --fetch-full-installer --full-installer-version 13.7.6
-          ls -l /Applications
 
-      - name: Create macOS Ventura Installer Disk
+      - name: Fetch Ventura 13.7.6 installer
+        run: |
+          sudo softwareupdate --fetch-full-installer --full-installer-version 13.7.6
+
+      - name: Create macOS Ventura Recovery Disk
         run: |
           set -e
-          sudo hdiutil create -o /tmp/Ventura -size 20000m -volname 'Ventura' -layout SPUD -fs HFS+J
-          sudo hdiutil attach /tmp/Ventura.dmg -noverify -mountpoint /Volumes/Ventura
+
+          echo "Disk space before:" && df -h
+
+          # Create a 1GB APFS disk image
+          DMG_PATH="/tmp/Ventura.dmg"
+          VOLUME_NAME="Ventura"
+          MOUNT_POINT="/Volumes/${VOLUME_NAME}"
+
+          sudo hdiutil create -o "$DMG_PATH" -size 1g -volname "$VOLUME_NAME" -layout GPTSPUD -fs APFS
+          sudo hdiutil attach "$DMG_PATH" -noverify -mountpoint "$MOUNT_POINT"
           sleep 10
-          sudo /Applications/"Install macOS Ventura.app"/Contents/Resources/createinstallmedia \
-            --volume /Volumes/Ventura --nointeraction
+
+          # Create installer
+          INSTALLER="/Applications/Install macOS Ventura.app"
+          sudo "${INSTALLER}/Contents/Resources/createinstallmedia" --volume "$MOUNT_POINT" --nointeraction
           sleep 10
-          cp -R /Volumes/"Install macOS Ventura"/com.apple.recovery.boot /tmp/com.apple.recovery.boot
+
+          # Extract com.apple.recovery.boot (~864 MB uncompressed)
+          RECOVERY_SRC="/Volumes/Install macOS Ventura/com.apple.recovery.boot"
+          RECOVERY_DST="/tmp/com.apple.recovery.boot"
+          cp -R "$RECOVERY_SRC" "$RECOVERY_DST"
+
+          # Create ISO from recovery folder
+          hdiutil makehybrid -o /tmp/com.apple.recovery.iso "$RECOVERY_DST" -iso -joliet
+
+          echo "Disk space after:" && df -h
+          du -sh "$RECOVERY_DST" "$DMG_PATH" /tmp/com.apple.recovery.iso
+
+      - name: Generate SHA256 checksums
+        run: |
+          cd /tmp
+          shasum -a 256 Ventura.dmg > Ventura.dmg.sha256
+          shasum -a 256 com.apple.recovery.iso > com.apple.recovery.iso.sha256
+          shasum -a 256 com.apple.recovery.boot/boot.efi > boot.efi.sha256 || true
 
       - name: Upload com.apple.recovery.boot
         uses: actions/upload-artifact@v4
         with:
           name: com.apple.recovery.boot
           path: /tmp/com.apple.recovery.boot
-          compression-level: 9
+
+      - name: Upload Ventura.dmg
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ventura.dmg
+          path: /tmp/Ventura.dmg
+
+      - name: Upload Ventura.dmg.sha256
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ventura.dmg.sha256
+          path: /tmp/Ventura.dmg.sha256
+
+      - name: Upload Recovery ISO
+        uses: actions/upload-artifact@v4
+        with:
+          name: com.apple.recovery.iso
+          path: /tmp/com.apple.recovery.iso
+
+      - name: Upload Recovery ISO checksum
+        uses: actions/upload-artifact@v4
+        with:
+          name: com.apple.recovery.iso.sha256
+          path: /tmp/com.apple.recovery.iso.sha256
+
+      - name: Upload boot.efi checksum (optional)
+        uses: actions/upload-artifact@v4
+        with:
+          name: boot.efi.sha256
+          path: /tmp/boot.efi.sha256
