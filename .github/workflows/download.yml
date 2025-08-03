@@ -1,92 +1,37 @@
-name: Generate macOS Ventura Recovery Image
+name: Generate macOS Tahoe Recovery Image
 
 on:
   workflow_dispatch:
 
+run-name: Generate macOS Tahoe Recovery Image
+
 jobs:
   build:
-    runs-on: macos-13  # Ventura-compatible GitHub runner
+    runs-on: macos-13
     steps:
       - uses: actions/checkout@v4
 
-      - name: Show available macOS installers
+      - name: Download Ventura 13.6.1 Installer (Apple official)
         run: |
-          softwareupdate --list-full-installers
+          curl -L -o /tmp/InstallAssistant.pkg \
+          https://swcdn.apple.com/content/downloads/46/29/042-94215-A_2AUGMBV1AE/kc63l0ghne4n88rmh98q0xtxj1cudr2mu0/InstallAssistant.pkg
 
-      - name: Fetch Ventura 13.7.6 installer
+      - name: Install the macOS Assistant
         run: |
-          sudo softwareupdate --fetch-full-installer --full-installer-version 13.7.6
+          sudo installer -pkg /tmp/InstallAssistant.pkg -target /
 
-      - name: Create macOS Ventura Recovery Disk
+      - name: Generate macOS Recovery Disk
         run: |
           set -e
-
-          echo "Disk space before:" && df -h
-
-          # Create a 1GB APFS disk image
-          DMG_PATH="/tmp/Ventura.dmg"
-          VOLUME_NAME="Ventura"
-          MOUNT_POINT="/Volumes/${VOLUME_NAME}"
-
-          sudo hdiutil create -o "$DMG_PATH" -size 1g -volname "$VOLUME_NAME" -layout GPTSPUD -fs APFS
-          sudo hdiutil attach "$DMG_PATH" -noverify -mountpoint "$MOUNT_POINT"
+          sudo hdiutil create -o /tmp/Tahoe -size 20000m -volname 'Tahoe' -layout SPUD -fs HFS+J
+          sudo hdiutil attach /tmp/Tahoe.dmg -noverify -mountpoint /Volumes/Tahoe
           sleep 10
-
-          # Create installer
-          INSTALLER="/Applications/Install macOS Ventura.app"
-          sudo "${INSTALLER}/Contents/Resources/createinstallmedia" --volume "$MOUNT_POINT" --nointeraction
-          sleep 10
-
-          # Extract com.apple.recovery.boot (~864 MB uncompressed)
-          RECOVERY_SRC="/Volumes/Install macOS Ventura/com.apple.recovery.boot"
-          RECOVERY_DST="/tmp/com.apple.recovery.boot"
-          cp -R "$RECOVERY_SRC" "$RECOVERY_DST"
-
-          # Create ISO from recovery folder
-          hdiutil makehybrid -o /tmp/com.apple.recovery.iso "$RECOVERY_DST" -iso -joliet
-
-          echo "Disk space after:" && df -h
-          du -sh "$RECOVERY_DST" "$DMG_PATH" /tmp/com.apple.recovery.iso
-
-      - name: Generate SHA256 checksums
-        run: |
-          cd /tmp
-          shasum -a 256 Ventura.dmg > Ventura.dmg.sha256
-          shasum -a 256 com.apple.recovery.iso > com.apple.recovery.iso.sha256
-          shasum -a 256 com.apple.recovery.boot/boot.efi > boot.efi.sha256 || true
+          sudo /Applications/Install\ macOS\ Ventura.app/Contents/Resources/createinstallmedia --volume /Volumes/Tahoe --nointeraction
+          cp -R /Volumes/Install\ macOS\ Ventura/BaseSystem /tmp/BaseSystem
 
       - name: Upload com.apple.recovery.boot
         uses: actions/upload-artifact@v4
         with:
           name: com.apple.recovery.boot
-          path: /tmp/com.apple.recovery.boot
-
-      - name: Upload Ventura.dmg
-        uses: actions/upload-artifact@v4
-        with:
-          name: Ventura.dmg
-          path: /tmp/Ventura.dmg
-
-      - name: Upload Ventura.dmg.sha256
-        uses: actions/upload-artifact@v4
-        with:
-          name: Ventura.dmg.sha256
-          path: /tmp/Ventura.dmg.sha256
-
-      - name: Upload Recovery ISO
-        uses: actions/upload-artifact@v4
-        with:
-          name: com.apple.recovery.iso
-          path: /tmp/com.apple.recovery.iso
-
-      - name: Upload Recovery ISO checksum
-        uses: actions/upload-artifact@v4
-        with:
-          name: com.apple.recovery.iso.sha256
-          path: /tmp/com.apple.recovery.iso.sha256
-
-      - name: Upload boot.efi checksum (optional)
-        uses: actions/upload-artifact@v4
-        with:
-          name: boot.efi.sha256
-          path: /tmp/boot.efi.sha256
+          path: /tmp/BaseSystem/*
+          compression-level: 9
