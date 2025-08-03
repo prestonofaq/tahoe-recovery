@@ -1,37 +1,34 @@
-name: Generate macOS Tahoe Recovery Image
+name: Generate macOS Ventura Recovery Image
 
 on:
   workflow_dispatch:
 
-run-name: Generate macOS Tahoe Recovery Image
-
 jobs:
   build:
-    runs-on: macos-13
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download Ventura 13.6.1 Installer (Apple official)
+      - name: Fetch Ventura Full Installer (13.7.6)
         run: |
-          curl -L -o /tmp/InstallAssistant.pkg \
-          https://swcdn.apple.com/content/downloads/46/29/042-94215-A_2AUGMBV1AE/kc63l0ghne4n88rmh98q0xtxj1cudr2mu0/InstallAssistant.pkg
+          softwareupdate --list-full-installers
+          sudo softwareupdate --fetch-full-installer --full-installer-version 13.7.6
 
-      - name: Install the macOS Assistant
+      - name: Create Ventura Installer Disk Image
         run: |
-          sudo installer -pkg /tmp/InstallAssistant.pkg -target /
-
-      - name: Generate macOS Recovery Disk
-        run: |
-          set -e
-          sudo hdiutil create -o /tmp/Tahoe -size 20000m -volname 'Tahoe' -layout SPUD -fs HFS+J
-          sudo hdiutil attach /tmp/Tahoe.dmg -noverify -mountpoint /Volumes/Tahoe
+          sudo hdiutil create -o /tmp/Ventura -size 16000m -layout GPTSPUD -fs HFS+J -volname "Ventura"
+          sudo hdiutil attach /tmp/Ventura.dmg -noverify -mountpoint /Volumes/Ventura
           sleep 10
-          sudo /Applications/Install\ macOS\ Ventura.app/Contents/Resources/createinstallmedia --volume /Volumes/Tahoe --nointeraction
-          cp -R /Volumes/Install\ macOS\ Ventura/BaseSystem /tmp/BaseSystem
+          sudo /Applications/Install\ macOS\ Ventura.app/Contents/Resources/createinstallmedia \
+            --volume /Volumes/Ventura --nointeraction
+
+      - name: Copy com.apple.recovery.boot
+        run: |
+          cp -R "/Volumes/Install macOS Ventura/com.apple.recovery.boot" /tmp/recovery-ventura
 
       - name: Upload com.apple.recovery.boot
         uses: actions/upload-artifact@v4
         with:
           name: com.apple.recovery.boot
-          path: /tmp/BaseSystem/*
+          path: /tmp/recovery-ventura/*
           compression-level: 9
