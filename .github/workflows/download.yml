@@ -7,17 +7,17 @@ run-name: Generate macOS Ventura Recovery Image
 
 jobs:
   build:
-    runs-on: macos-13 # Ventura-compatible runner
+    runs-on: macos-13
     steps:
       - uses: actions/checkout@v4
 
       - name: Install macOS Ventura Installer via softwareupdate
         run: |
           set -e
-          # List available installers
+          # List what's available for debugging
           softwareupdate --list-full-installers
-          # Download Ventura (13.6.6 is a common latest version)
-          sudo softwareupdate --fetch-full-installer --full-installer-version 13.6.6
+          # ✅ Download Ventura 13.7.6
+          sudo softwareupdate --fetch-full-installer --full-installer-version 13.7.6
           ls -l /Applications
 
       - name: Create macOS Ventura Installer Disk
